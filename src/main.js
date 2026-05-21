@@ -48,9 +48,14 @@ app.innerHTML = `
       <div id="sidebar" class="space-y-4 overflow-y-auto scrollbar-thin"></div>
     </aside>
 
-    <main class="flex-1 p-4">
-      <div class="h-full overflow-hidden rounded-2xl border border-slate-800 bg-black">
-        <div id="sketch-holder" class="h-full w-full"></div>
+    <main class="flex-1 p-4 text-white">
+      <div class="relative h-full overflow-hidden rounded-2xl border border-slate-800 bg-black">
+        <div id="sketch-holder" class="h-full w-full">
+          <div class="absolute bottom-0 left-0 p-4">
+            <div id="poly-label" class="font-jost font-medium text-6xl">Ilmenau jo jo</div>
+            <div id="poly-face-list" class="font-jost text-xl">Ilmenau jo jo</div>
+          </div>
+        </div>
       </div>
     </main>
   </div>
@@ -88,7 +93,7 @@ function renderSidebar(query = '') {
             ${items.map(item => `
               <li>
                 <button
-                  class="item-btn w-full text-left px-3 py-2 rounded-lg text-white hover:bg-slate-800"
+                  class="item-btn w-full text-left px-3 py-1 rounded-lg text-white hover:bg-slate-800"
                   data-url="${item.url || ''}"
                   data-name="${item.name}"
                 >
@@ -119,4 +124,3 @@ renderSidebar()
 search.addEventListener('input', (e) => {
   renderSidebar(e.target.value)
 })
-
