@@ -1,3 +1,7 @@
+
+dual/
+parse/res/
+
 # Logs
 logs
 *.log
