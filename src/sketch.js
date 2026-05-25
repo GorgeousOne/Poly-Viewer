@@ -1,9 +1,10 @@
 import p5 from 'p5'
 import { polyData } from './main.js'
 
-const p5Holder = document.querySelector('#sketch-holder')
-const polyLabel = document.querySelector('#poly-label')
-const polyFaceList = document.querySelector('#poly-face-list')
+const p5Holder = document.querySelector('#sketch-holder');
+const polyLabel = document.querySelector('#poly-label');
+const polyFaceList = document.querySelector('#poly-face-list');
+const dualCheck = document.querySelector('#dual-check');
 
 window.sketchAPI = {};
 
@@ -35,15 +36,12 @@ new p5((p) => {
 		p.colorMode(p.HSB, 255);
 
 		polyData.forEach(d => loadPoly(d.url, d.name));
-		displayPoly('Icsahedron');
-		// limit zoom factor... weirdly
+		// limit zoom factor to 0.5x-2.0x weirdly
 		p._renderer.mainCamera.cameraNear = 400;
 		p._renderer.mainCamera.cameraFar = 1600;
 	}
 
 	p.draw = () => {
-		console.log(p._renderer.mainCamera.eyeZ, p._renderer.mainCamera.cameraNear, p._renderer.mainCamera.cameraFar)
-		// console.log(p._renderer.mainCamera.eyeZ);
 		p.background(10)
 		p.orbitControl(1, 1, 1, { freeRotation: true });
 		p.scale(2.5);
@@ -76,7 +74,7 @@ new p5((p) => {
 
 	function rngHsb() {
 		lastHue = (lastHue + goldenAngle) % 255;
-		return p.color(lastHue, 0.8 * 255, 0.8 * 255);
+		return p.color(lastHue, 0.75 * 255, 0.9 * 255);
 	}
 
 	function placeLights() {
@@ -115,24 +113,20 @@ new p5((p) => {
 			lightDir.y,
 			lightDir.z
 		);
-
-		let pointPos = p.createVector(
-			cam.eyeX,
-			cam.eyeY,
-			cam.eyeZ
-		).add(
-			up.copy().mult(focusDist)
-		);
 	}
 
 	async function loadPoly(url, modelKey) {
 		console.log('loading... ', modelKey);
 		const paint = rngHsb();
-		const poly = await p.loadModel(url, true);
+		const poly = await p.loadModel(url);
+
+		const [center, radius] = calcMeanBoundingSphere(poly);
+		const targetScale = 100 / radius;
+		normalizeModel(poly, center, targetScale);
 
 		const faceCounts = [];
 		// dont list faces of these fucked up models? xD
-		if (url.includes('platonic') || url.includes('archimedian') || url.includes('catalan')) {
+		// if (url.includes('platonic') || url.includes('archimedian') || url.includes('catalan')) {
 			const txt = await fetch(url).then(r => r.text());
 			for (const line of txt.split('\n')) {
 				if (line.startsWith('f ')) {
@@ -140,7 +134,7 @@ new p5((p) => {
 					faceCounts[faceSize] = (faceCounts[faceSize] || 0) + 1;
 				}
 			}
-		}
+		// }
 		// could also put the fuller file path in button dataset for uniqueness
 		loadedModels[modelKey] = { shape: poly, paint: paint, faceCounts: faceCounts };
 	}
@@ -149,14 +143,40 @@ new p5((p) => {
 		currentModel = name;
 		polyLabel.textContent = name;
 		polyFaceList.textContent = "lot of faces :)";
+
 		if (currentModel in loadedModels) {
 			const faceCounts = loadedModels[currentModel].faceCounts;
 			polyFaceList.textContent = Object.entries(faceCounts)
 				.sort((a, b) => Number(a[0]) - Number(b[0]))
 				.map(([size, count]) => `${count} ${polygonNames[size]}`)
 				.join(', ');
-		} else {
 		}
+	}
+
+	function calcMeanBoundingSphere(model) {
+		// compute mean center
+		const center = p.createVector(0, 0, 0);
+
+		for (let i = 0; i < model.vertices.length; i++) {
+			center.add(model.vertices[i]);
+		}
+		center.div(model.vertices.length);
+
+		// find bounding radius
+		let maxDist = 0;
+
+		for (let i = 0; i < model.vertices.length; i++) {
+			const d = center.dist(model.vertices[i]);
+			maxDist = Math.max(maxDist, d);
+		}
+		return  [center, maxDist];
+	}
+
+	function normalizeModel(model, center, scale) {
+		for (let i = 0; i < model.vertices.length; i++) {
+			model.vertices[i].sub(center);
+			model.vertices[i].mult(scale);
+		}	
 	}
 
 	window.sketchAPI = {
