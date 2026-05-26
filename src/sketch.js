@@ -22,23 +22,15 @@ new p5((p) => {
 	let loadedModels = {};
 	let currentModel = '';
 
-	const loadOpts = {
-		// Enables standardized size scaling during loading if set to true.
-		normalize: true,
-		// successCallback: handleModel,
-		// failureCallback: handleError,
-		fileType: '.obj',
-	}
-
 	p.setup = () => {
 		p.createCanvas(p5Holder.clientWidth, p5Holder.clientHeight, p.WEBGL)
-		p.noStroke();
 		p.colorMode(p.HSB, 255);
-
+		p.strokeWeight(0.5);		
+		p.noStroke();
 		polyData.forEach(d => loadPoly(d.url, d.name));
 		// limit zoom factor to 0.5x-2.0x weirdly
 		p._renderer.mainCamera.cameraNear = 400;
-		p._renderer.mainCamera.cameraFar = 1600;
+		p._renderer.mainCamera.cameraFar = 1600;		
 	}
 
 	p.draw = () => {
@@ -49,10 +41,12 @@ new p5((p) => {
 
 		p.specularMaterial(10);
 		p.shininess(10);
-
+		
 		if (currentModel in loadedModels) {
 			const model = loadedModels[currentModel]
+			drawEdges(model.geom);
 			p.fill(model.paint);
+			p.noStroke();
 			p.model(model.shape);
 		} else {
 			const dotty = 10;
@@ -63,6 +57,21 @@ new p5((p) => {
 			p.translate(5 * dotty, 0, 0);
 			p.sphere(dotty);
 		}
+	}
+
+	function drawEdges(geom) {
+		p.stroke(64);		
+		p.beginShape(p.LINES);
+		for (const face of geom.faces) {
+			const n = face.length;
+			for (let i = 0; i < n; ++i) {
+				const v0 = geom.vertices[face[i]];
+				const v1 = geom.vertices[face[(i + 1) % n]];
+				p.vertex(v0.x, v0.y, v0.z)
+				p.vertex(v1.x, v1.y, v1.z);
+			}
+		}
+		p.endShape();
 	}
 
 	p.windowResized = () => {
@@ -125,18 +134,15 @@ new p5((p) => {
 		normalizeModel(poly, center, targetScale);
 
 		const faceCounts = [];
-		// dont list faces of these fucked up models? xD
-		// if (url.includes('platonic') || url.includes('archimedian') || url.includes('catalan')) {
-			const txt = await fetch(url).then(r => r.text());
-			for (const line of txt.split('\n')) {
-				if (line.startsWith('f ')) {
-					const faceSize = line.trim().split(/\s+/).slice(1).length;
-					faceCounts[faceSize] = (faceCounts[faceSize] || 0) + 1;
-				}
-			}
-		// }
-		// could also put the fuller file path in button dataset for uniqueness
-		loadedModels[modelKey] = { shape: poly, paint: paint, faceCounts: faceCounts };
+		const text = await fetch(url).then(r => r.text().then(t => t.split('\n')));
+		const geom = parseObj(text);
+		normalizeModel(geom, center, targetScale);
+
+		for (const face of geom.faces) {
+			const faceSize = face.length;
+			faceCounts[faceSize] = (faceCounts[faceSize] || 0) + 1;
+		}
+		loadedModels[modelKey] = { shape: poly, geom: geom, paint: paint, faceCounts: faceCounts };
 	}
 
 	function displayPoly(name) {
@@ -169,14 +175,36 @@ new p5((p) => {
 			const d = center.dist(model.vertices[i]);
 			maxDist = Math.max(maxDist, d);
 		}
-		return  [center, maxDist];
+		return [center, maxDist];
+	}
+
+	function parseObj(lines) {
+		const v = [];
+		const f = [];
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i].trim();
+			if (!line) continue;
+
+			const tokens = line.split(/\s+/);
+			const type = tokens[0];
+
+			if (type === "v") {
+				v.push(p.createVector(+tokens[1], +tokens[2], +tokens[3]));
+			}
+			else if (type === "f") {
+				tokens.shift();
+				f.push(tokens.map(t => +t.split('/')[0]-1));				
+			}
+		}
+		return {vertices: v, faces: f};
 	}
 
 	function normalizeModel(model, center, scale) {
 		for (let i = 0; i < model.vertices.length; i++) {
 			model.vertices[i].sub(center);
 			model.vertices[i].mult(scale);
-		}	
+		}
 	}
 
 	window.sketchAPI = {
