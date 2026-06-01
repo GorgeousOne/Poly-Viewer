@@ -51,8 +51,8 @@ app.innerHTML = `
     <main class="flex-1 p-4 text-white">
       <div class="relative h-full overflow-hidden rounded-2xl border border-slate-800 bg-black">
         <div id="sketch-holder" class="h-full w-full">
-          <div id="dual-check" class="absolute bottom-0 right-0 p-6 flex items-center space-x-2">
-            <input
+          <div id="dual-box" class="absolute bottom-0 right-0 p-6 flex items-center space-x-2 hidden">
+            <input id="dual-check"
               type="checkbox"
               class="
                 //hide default look
@@ -157,6 +157,7 @@ sidebar.addEventListener('click', (e) => {
   const url = btn.dataset.url;
   const name = btn.dataset.name;
   window.sketchAPI.displayPoly(name);
+
 });
 
 renderSidebar()

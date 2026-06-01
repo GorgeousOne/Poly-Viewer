@@ -6,6 +6,7 @@ const p5Holder = document.querySelector('#sketch-holder');
 const polyLabel = document.querySelector('#poly-label');
 const polyFaceList = document.querySelector('#poly-face-list');
 const dualCheck = document.querySelector('#dual-check');
+const dualBox = document.querySelector('#dual-box');
 
 window.sketchAPI = {};
 
@@ -50,13 +51,13 @@ new p5((p) => {
 				const ab = p5.Vector.sub(vertices[face[0]], vertices[face[1]]);
 				const ac = p5.Vector.sub(vertices[face[2]], vertices[face[1]]);
 				const normal = ac.cross(ab).normalize();
-			
+
 				p.beginShape();
 				p.normal(normal.x, normal.y, normal.z)
-				for (const fi of face) {					
+				for (const fi of face) {
 					const v = vertices[fi]
 					p.vertex(v.x, v.y, v.z);
-					
+
 				}
 				p.endShape(p.CLOSE);
 			}
@@ -78,12 +79,14 @@ new p5((p) => {
 			p.noStroke();
 			p.fill(model.paint);
 			p.model(model.pGeom);
-			drawEdges(model.mesh);
+			drawEdges(model.mesh, 64);
 
-			if (model.dualPGeom) {
+			// console.log(dualCheck.checked);
+
+			if (dualCheck.checked && model.dualPGeom) {
 				p.fill(0.8 * 255);
 				p.model(model.dualPGeom);
-				drawEdges(model.dualMesh);
+				drawEdges(model.dualMesh, 128);
 			}
 		} else {
 			const dotty = 10;
@@ -96,16 +99,11 @@ new p5((p) => {
 		}
 	}
 
-	function drawEdges(mesh) {
-		p.stroke(64);
-
-		p.beginShape(p.LINES);
-		p.vertex(115, 0, 0)
-		p.vertex(0, 115, 0)
-		p.endShape();
-
+	function drawEdges(mesh, bright) {
+		p.stroke(bright);
 		p.beginShape(p.LINES);
 		const visited = new Set();
+
 		for (const face of mesh.faces) {
 			const n = face.length;
 			for (let i = 0; i < n; ++i) {
@@ -113,11 +111,13 @@ new p5((p) => {
 				const f1 = face[(i + 1) % n];
 				const str0 = `${f0},${f1}`
 				const str1 = `${f0},${f1}`
+
 				if (str0 in visited || str1 in visited) {
 					continue;
+				} else {
+					visited.add(str0);
+					visited.add(str1);
 				}
-				visited.add(str0);
-				visited.add(str1);
 				const v0 = mesh.vertices[f0];
 				const v1 = mesh.vertices[f1];
 				p.vertex(v0.x, v0.y, v0.z)
@@ -181,7 +181,6 @@ new p5((p) => {
 		console.log('loading... ', modelKey);
 		const paint = rngHsb();
 		const pGeom = await p.loadModel(url);
-		console.log(pGeom)
 
 		const [center, radius] = calcMeanBoundingSphere(pGeom);
 		const targetScale = 100 / radius;
@@ -196,26 +195,32 @@ new p5((p) => {
 			const faceSize = face.length;
 			faceCounts[faceSize] = (faceCounts[faceSize] || 0) + 1;
 		}
-		const model = { pGeom: pGeom, mesh: mesh, paint: paint, faceCounts: faceCounts };
+		const model = { url: url, pGeom: pGeom, mesh: mesh, paint: paint, faceCounts: faceCounts };
 
-		if (url.includes('platonic') || url.includes('archimedian')) {
+		if (hasDual(url)) {
 			model.dualMesh = calcDual(p, mesh);
 		}
 		loadedModels[modelKey] = model;
 		return model;
 	}
 
-	function displayPoly(name) {
-		currentModel = name;
-		polyLabel.textContent = name;
+	function hasDual(url) {
+		return url.includes('platonic') || url.includes('archimedian');
+	}
+
+	function displayPoly(modelKey) {
+		currentModel = modelKey;
+		polyLabel.textContent = modelKey;
 		polyFaceList.textContent = "lot of faces :)";
 
 		if (currentModel in loadedModels) {
-			const faceCounts = loadedModels[currentModel].faceCounts;
+			const model = loadedModels[currentModel]
+			const faceCounts = model.faceCounts;
 			polyFaceList.textContent = Object.entries(faceCounts)
 				.sort((a, b) => Number(a[0]) - Number(b[0]))
 				.map(([size, count]) => `${count} ${polygonNames[size]}`)
 				.join(', ');
+			dualBox.classList.toggle('hidden', !hasDual(model.url));
 		}
 	}
 
