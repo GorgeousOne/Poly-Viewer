@@ -1,5 +1,6 @@
 import p5 from 'p5'
 import { polyData } from './main.js'
+import { calcDual } from './dorman_luke.js';
 
 const p5Holder = document.querySelector('#sketch-holder');
 const polyLabel = document.querySelector('#poly-label');
@@ -25,13 +26,43 @@ new p5((p) => {
 	p.setup = () => {
 		p.createCanvas(p5Holder.clientWidth, p5Holder.clientHeight, p.WEBGL)
 		p.colorMode(p.HSB, 255);
-		p.strokeWeight(0.5);		
+		p.strokeWeight(0.5);
 		p.noStroke();
-		polyData.forEach(d => loadPoly(d.url, d.name));
+
+		Promise.all(polyData.map(d => loadPoly(d.url, d.name)))
+			.then(async results => {
+				for (const model of results) {
+					if (model.dualMesh) {
+						model.dualPGeom = await createPGeom(model.dualMesh);
+					}
+				}
+			});
+
 		// limit zoom factor to 0.5x-2.0x weirdly
 		p._renderer.mainCamera.cameraNear = 400;
-		p._renderer.mainCamera.cameraFar = 1600;		
+		p._renderer.mainCamera.cameraFar = 1600;
 	}
+
+	function createPGeom(mesh) {
+		return p.buildGeometry(() => {
+			const { vertices, faces } = mesh;
+			for (const face of faces) {
+				const ab = p5.Vector.sub(vertices[face[0]], vertices[face[1]]);
+				const ac = p5.Vector.sub(vertices[face[2]], vertices[face[1]]);
+				const normal = ac.cross(ab).normalize();
+			
+				p.beginShape();
+				p.normal(normal.x, normal.y, normal.z)
+				for (const fi of face) {					
+					const v = vertices[fi]
+					p.vertex(v.x, v.y, v.z);
+					
+				}
+				p.endShape(p.CLOSE);
+			}
+		});
+	}
+
 
 	p.draw = () => {
 		p.background(10)
@@ -41,13 +72,19 @@ new p5((p) => {
 
 		p.specularMaterial(10);
 		p.shininess(10);
-		
+
 		if (currentModel in loadedModels) {
 			const model = loadedModels[currentModel]
-			drawEdges(model.geom);
-			p.fill(model.paint);
 			p.noStroke();
-			p.model(model.shape);
+			p.fill(model.paint);
+			p.model(model.pGeom);
+			drawEdges(model.mesh);
+
+			if (model.dualPGeom) {
+				p.fill(0.8 * 255);
+				p.model(model.dualPGeom);
+				drawEdges(model.dualMesh);
+			}
 		} else {
 			const dotty = 10;
 			p.translate(-5 * dotty, 0, 0);
@@ -59,14 +96,30 @@ new p5((p) => {
 		}
 	}
 
-	function drawEdges(geom) {
-		p.stroke(64);		
+	function drawEdges(mesh) {
+		p.stroke(64);
+
 		p.beginShape(p.LINES);
-		for (const face of geom.faces) {
+		p.vertex(115, 0, 0)
+		p.vertex(0, 115, 0)
+		p.endShape();
+
+		p.beginShape(p.LINES);
+		const visited = new Set();
+		for (const face of mesh.faces) {
 			const n = face.length;
 			for (let i = 0; i < n; ++i) {
-				const v0 = geom.vertices[face[i]];
-				const v1 = geom.vertices[face[(i + 1) % n]];
+				const f0 = face[i];
+				const f1 = face[(i + 1) % n];
+				const str0 = `${f0},${f1}`
+				const str1 = `${f0},${f1}`
+				if (str0 in visited || str1 in visited) {
+					continue;
+				}
+				visited.add(str0);
+				visited.add(str1);
+				const v0 = mesh.vertices[f0];
+				const v1 = mesh.vertices[f1];
 				p.vertex(v0.x, v0.y, v0.z)
 				p.vertex(v1.x, v1.y, v1.z);
 			}
@@ -127,22 +180,29 @@ new p5((p) => {
 	async function loadPoly(url, modelKey) {
 		console.log('loading... ', modelKey);
 		const paint = rngHsb();
-		const poly = await p.loadModel(url);
+		const pGeom = await p.loadModel(url);
+		console.log(pGeom)
 
-		const [center, radius] = calcMeanBoundingSphere(poly);
+		const [center, radius] = calcMeanBoundingSphere(pGeom);
 		const targetScale = 100 / radius;
-		normalizeModel(poly, center, targetScale);
+		normalizeModel(pGeom, center, targetScale);
 
 		const faceCounts = [];
 		const text = await fetch(url).then(r => r.text().then(t => t.split('\n')));
-		const geom = parseObj(text);
-		normalizeModel(geom, center, targetScale);
+		const mesh = parseObj(text);
+		normalizeModel(mesh, center, targetScale);
 
-		for (const face of geom.faces) {
+		for (const face of mesh.faces) {
 			const faceSize = face.length;
 			faceCounts[faceSize] = (faceCounts[faceSize] || 0) + 1;
 		}
-		loadedModels[modelKey] = { shape: poly, geom: geom, paint: paint, faceCounts: faceCounts };
+		const model = { pGeom: pGeom, mesh: mesh, paint: paint, faceCounts: faceCounts };
+
+		if (url.includes('platonic') || url.includes('archimedian')) {
+			model.dualMesh = calcDual(p, mesh);
+		}
+		loadedModels[modelKey] = model;
+		return model;
 	}
 
 	function displayPoly(name) {
@@ -194,10 +254,10 @@ new p5((p) => {
 			}
 			else if (type === "f") {
 				tokens.shift();
-				f.push(tokens.map(t => +t.split('/')[0]-1));				
+				f.push(tokens.map(t => +t.split('/')[0] - 1));
 			}
 		}
-		return {vertices: v, faces: f};
+		return { vertices: v, faces: f };
 	}
 
 	function normalizeModel(model, center, scale) {
