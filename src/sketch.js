@@ -27,7 +27,7 @@ new p5((p) => {
 	p.setup = () => {
 		p.createCanvas(p5Holder.clientWidth, p5Holder.clientHeight, p.WEBGL)
 		p.colorMode(p.HSB, 255);
-		p.strokeWeight(0.5);
+		p.strokeWeight(1);
 		p.noStroke();
 
 		Promise.all(polyData.map(d => loadPoly(d.url, d.name)))
@@ -100,7 +100,7 @@ new p5((p) => {
 	}
 
 	function drawEdges(mesh, bright) {
-		p.stroke(bright);
+		p.stroke(bright, 32);
 		p.beginShape(p.LINES);
 		const visited = new Set();
 

@@ -2,7 +2,8 @@ import './style.css'
 
 
 const models = import.meta.glob('./assets/models/*/*.obj', {
-  as: 'url',
+  query: '?url',
+  import: 'default',
   eager: true
 });
 
