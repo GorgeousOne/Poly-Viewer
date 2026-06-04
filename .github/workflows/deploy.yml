@@ -27,7 +27,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - run: npm ci
       - run: npm run build
@@ -40,6 +40,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
 
+  permissions:
+    id-token: write
+    pages: write
+    
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
