@@ -20,7 +20,6 @@ const polygonNames = {
 }
 
 new p5((p) => {
-	let t = 0;
 	let loadedModels = {};
 	let currentModel = '';
 
@@ -30,7 +29,7 @@ new p5((p) => {
 		p.strokeWeight(1);
 		p.noStroke();
 
-		Promise.all(polyData.map(d => loadPoly(d.url, d.name)))
+		Promise.all(polyData.map(d => loadPoly(d.url, d.name, d.section)))
 			.then(async results => {
 				for (const model of results) {
 					if (model.dualMesh) {
@@ -63,7 +62,6 @@ new p5((p) => {
 			}
 		});
 	}
-
 
 	p.draw = () => {
 		p.background(10)
@@ -177,7 +175,7 @@ new p5((p) => {
 		);
 	}
 
-	async function loadPoly(url, modelKey) {
+	async function loadPoly(url, modelKey, modelSection) {
 		console.log('loading... ', modelKey);
 		const paint = rngHsb();
 		const pGeom = await p.loadModel(url);
@@ -197,15 +195,15 @@ new p5((p) => {
 		}
 		const model = { url: url, pGeom: pGeom, mesh: mesh, paint: paint, faceCounts: faceCounts };
 
-		if (hasDual(url)) {
+		if (hasDual(modelSection)) {
 			model.dualMesh = calcDual(p, mesh);
 		}
 		loadedModels[modelKey] = model;
 		return model;
 	}
 
-	function hasDual(url) {
-		return url.includes('platonic') || url.includes('archimedian');
+	function hasDual(section) {
+		return section.includes('platonic') || section.includes('archimedian');
 	}
 
 	function displayPoly(modelKey) {
@@ -220,7 +218,16 @@ new p5((p) => {
 				.sort((a, b) => Number(a[0]) - Number(b[0]))
 				.map(([size, count]) => `${count} ${polygonNames[size]}`)
 				.join(', ');
-			dualBox.classList.toggle('hidden', !hasDual(model.url));
+			
+			console.log("can enable", hasDual(model.url));
+			if(hasDual(model.url)) {
+				dualCheck.removeAttribute("disabled");
+				dualBox.classList.remove("text-gray-700");
+			} else {
+				dualCheck.setAttribute("disabled", true);
+				dualBox.classList.add("text-gray-700");
+			}
+			// dualBox.classList.toggle('hidden', !hasDual(model.url));
 		}
 	}
 

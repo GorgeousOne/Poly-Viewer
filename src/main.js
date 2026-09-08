@@ -1,16 +1,16 @@
 import './style.css'
 
 
-const models = import.meta.glob('./assets/models/*/*.obj', {
+const modelsPaths = import.meta.glob('./assets/models/*/*.obj', {
   query: '?url',
   import: 'default',
   eager: true
 });
 
-export const polyData = Object.entries(models).map(([path, url]) => {
+export const polyData = Object.entries(modelsPaths).map(([path, url]) => {
   const parts = path.split('/');
-  const section = parts[3]; //sub folder name
-  const name = parts.pop().replace('.obj', '');
+  const section = parts.at(-2); //sub folder name
+  const name = parts.at(-1).replace('.obj', '');
 
   return {
     section,
@@ -52,9 +52,10 @@ app.innerHTML = `
     <main class="flex-1 p-4 text-white">
       <div class="relative h-full overflow-hidden rounded-2xl border border-slate-800 bg-black">
         <div id="sketch-holder" class="h-full w-full">
-          <div id="dual-box" class="absolute bottom-0 right-0 p-6 flex items-center space-x-2 hidden">
+          <div id="dual-box" class="absolute bottom-0 right-0 p-6 flex items-center space-x-2 text-gray-700">
             <input id="dual-check"
               type="checkbox"
+              disabled
               class="
                 //hide default look
                 appearance-none
@@ -66,6 +67,9 @@ app.innerHTML = `
                 bg-transparent
                 cursor-pointer
 
+                disabled:border-gray-800
+                disabled:cursor-not-allowed
+
                 checked:bg-transparent
                 checked:border-white
 
@@ -76,6 +80,7 @@ app.innerHTML = `
                 before:absolute
                 before:hidden
                 checked:before:block
+                disabled:before:border-gray-800
 
                 before:w-[8px]
                 before:h-[14px]
